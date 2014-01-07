@@ -46,6 +46,7 @@
 #     http://papers.ssrn.com/sol3/papers.cfm?abstract_id=1314585
 #
 
+import yfinance
 import numpy as np
 from scipy import linalg
 
@@ -213,3 +214,5 @@ tauV = tau * V
 Omega = np.array([[bl_omega(conf1, P1, tauV), 0, 0],[0, bl_omega(conf2, P2, tauV), 0],[0, 0, bl_omega(conf3, P3, tauV)]])
 res = altblacklitterman(delta, weq, V, tau, P, Q, Omega)
 display('Idzorek Method',assets,res)
+
+print(yfinance.parse_yfin("data/aapl.csv"))
