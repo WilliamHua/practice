@@ -1,8 +1,9 @@
 import math
+import csv
 
 #FDM pricing methods for vanilla and binary options
 
-def basket(Vol_H, Vol_L, r, bStrike, lowStrike, highStrike, Expiration, NAS, weight1, weight2):
+def basket(Vol_H, Vol_L, r, bStrike, lowStrike, highStrike, Expiration, NAS, weight1, weight2, binaryPos):
     ds = 2 * highStrike / NAS   
     dt = 0.9 / Vol_H ** 2 / NAS ** 2
     NTS = int(Expiration/dt) + 1
@@ -16,7 +17,7 @@ def basket(Vol_H, Vol_L, r, bStrike, lowStrike, highStrike, Expiration, NAS, wei
 
     for i in range(NAS):
         assetPrices[i] = i * ds
-        payoff[i] = (heaviside(assetPrices[i], bStrike) + weight1 * max(assetPrices[i] - lowStrike, 0) + weight2 * max(assetPrices[i] - highStrike, 0)) * 1000
+        payoff[i] = ( binaryPos * heaviside(assetPrices[i], bStrike) + weight1 * max(assetPrices[i] - lowStrike, 0) + weight2 * max(assetPrices[i] - highStrike, 0)) * 1000
         vold[i] = payoff[i]
 
     for i in range(NTS):
@@ -24,7 +25,7 @@ def basket(Vol_H, Vol_L, r, bStrike, lowStrike, highStrike, Expiration, NAS, wei
             Delta = (vold[j + 1] - vold[j - 1]) / (2 * ds)
             Gamma = (vold[j + 1] - 2 * vold[j] + vold[j - 1]) / (ds ** 2)
 
-            if(Gamma >= 0):
+            if Gamma >= 0:
                 Vol = Vol_L
             else: 
                 Vol = Vol_H
@@ -58,10 +59,12 @@ def option(Vol_H, Vol_L, r, Option_Type, Strike, Expiration, NAS, position):
 
     for i in range(NAS):
         assetPrices[i] = i * ds
-        if Option_Type == "vanilla":
+        if Option_Type == "call":
             payoff[i] = max(assetPrices[i] - Strike, 0) * 1000
+        elif Option_Type == "put":
+            payoff[i] = max(Strike - assetPrices[i], 0) * 1000
         elif Option_Type == "binary":
-            payoff[i] = heaviside(assetPrices[i], Strike) * 1000
+            payoff[i] = heaviside(assetPrices[i], Strike) * 1000 * position
         else:
             print "Option_Type unrecognized"
         vold[i] = payoff[i]
@@ -71,7 +74,7 @@ def option(Vol_H, Vol_L, r, Option_Type, Strike, Expiration, NAS, position):
             Delta = (vold[j + 1] - vold[j - 1]) / (2 * ds)
             Gamma = (vold[j + 1] - 2 * vold[j] + vold[j - 1]) / (ds ** 2)
 
-            if position * Gamma >= 0:
+            if Gamma >= 0:
                 Vol = Vol_L
             else: 
                 Vol = Vol_H
@@ -110,27 +113,48 @@ def findValue(arrays, value):
         if arrays[0][i] == value:
             return arrays[2][i]
 
+def payout(bStrike, lowStrike, highStrike, weight1, weight2, binaryPos):
+    heaviside = lambda x, y: 1 if x > y else 0 
+
+    payoff = []
+    for i in range(0, 200, 1):
+        payoff.append(( binaryPos*heaviside(i, bStrike) + weight1 * max(i - lowStrike, 0) + weight2 * max(i - highStrike, 0)))
+    return payoff
+    
 lowerOption = BlackScholes(100, 90, .5, .05, .25)
 higherOption = BlackScholes(100, 110, .5, .05, .25)
 
 realLower = 14.81
 realHigher = 4.94
 
-
-#baskets = basket(.3, .2, .05, 100, 90, 110, .5, 100, -.05, .05)
-#print str(findValue(baskets, 100))
-binary = option(.3, .2, .05, "binary", 100, .5, 100, -1)
-
 minimum = [100, 100, 100]
-for i in range(-10, 0):
-    for j in range(1, 10):
-        baskets = basket(.3, .2, .05, 100, 90, 110, .5, 100, i/100.0, j/100.0) 
+maximum = [-5, -5, -5]
+for i in range(-10, 10): #-10, 0
+    for j in range(-10, 10): #1, 10
+        baskets = basket(.3, .2, .05, 100, 90, 110, .5, 200, i/100.0, j/100.0, -1) 
         value = findValue(baskets, 100) - i/100.0 * lowerOption - j/100.0 * higherOption
         if(abs(minimum[2]) > abs(findValue(baskets, 100))): #and findValue(baskets, 80) < .001):
-            print "i: " + str(i) + " j: " + str(j) + "baskets: " + str(findValue(baskets, 100))
+            #str(findValue(baskets, 100))
             minimum[0] = i
             minimum[1] = j
             minimum[2] = findValue(baskets, 100)
+        if(maximum[2] < value):
+            print "i: " + str(i) + " j: " + str(j) + "baskets: " + str(value)
+            maximum[0] = i
+            maximum[1] = j
+            maximum[2] = value
 
 print "MIN: Lambda1 = " + str(minimum[0]) + " Lambda2: " + str(minimum[1]) + " Value: " + str(minimum[2]) 
+print "MAX: Lambda1 = " + str(maximum[0]) + " Lambda2: " + str(maximum[1]) + " Value: " + str(maximum[2])
 print "Backed binary: " + str(minimum[2] - minimum[0]/100.0*lowerOption - minimum[1]/100.0*higherOption)
+
+binary = option(.3, .2, .05, "binary", 100, .5, 200, -1)
+what2 = basket(.3, .2, .05, 100, 90, 110, .5, 200, -.05, .05, 1)
+print "backed binary: " + str(findValue(what2, 100) + .05* lowerOption - .05*higherOption)
+what = payout(100, 90, 110, .06, -.06, -1)
+with open("output.csv", "wb") as csvfile:
+    spamwriter = csv.writer(csvfile, delimiter=",")
+    for x in range(len(what)): #FIXME: what[0]
+        spamwriter.writerow([str(x)] + [str(what[x])] + [what2[2][x]])
+        #spamwriter.writerow([str(what[0][x])] + [str(what[2][x])])
+
