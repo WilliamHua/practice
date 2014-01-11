@@ -72,13 +72,13 @@ def excess(covar_matrix, weights, risk):
 def error(covar_matrix, tau):
     return inv(covar_matrix * tau)
 
-def omega_inverse(views, covar_matrix, tau):
-    return inv(diagonalize(dot(dot((views * tau), covar_matrix), views.T)))
+def omega(views, covar_matrix, tau):
+    return diagonalize(dot(dot((views * tau), covar_matrix), views.T))
 
-def first_multiplier(return_error, views, omega_inv):
+def inside(return_error, views, omega):
     return return_error + dot(dot(views.T, omega_inv), views) 
 
-def second_multiplier(return_error, equal_excess, views, omega_inv, return_views):
+def second_multiplier(return_error, equal_excess, views, omega, return_views):
     return dot(return_error, equal_excess) + dot(dot(views.T, omega_inv), return_views)
 
 def post_exp_ret(first_mult, second_mult):
